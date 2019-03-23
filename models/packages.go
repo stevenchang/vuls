@@ -88,16 +88,16 @@ func (ps Packages) FindByFQPN(nameVerRelArc string) (*Package, error) {
 
 // Package has installed binary packages.
 type Package struct {
-	Name             string               `json:"name"`
-	Version          string               `json:"version"`
-	Release          string               `json:"release"`
-	NewVersion       string               `json:"newVersion"`
-	NewRelease       string               `json:"newRelease"`
-	Arch             string               `json:"arch"`
-	Repository       string               `json:"repository"`
-	Changelog        Changelog            `json:"changelog"`
-	AffectedProcs    []AffectedProcess    `json:",omitempty"`
-	NeedRestartProcs []NeedRestartProcess `json:",omitempty"`
+	Name             string               `json:"name" bson:"name"`
+	Version          string               `json:"version" bson:"version"`
+	Release          string               `json:"release" bson:"release"`
+	NewVersion       string               `json:"newVersion" bson:"newVersion"`
+	NewRelease       string               `json:"newRelease" bson:"newRelease"`
+	Arch             string               `json:"arch" bson:"arch"`
+	Repository       string               `json:"repository" bson:"repository"`
+	Changelog        Changelog            `json:"changelog" bson:"changelog"`
+	AffectedProcs    []AffectedProcess    `json:",omitempty" bson:",omitempty"`
+	NeedRestartProcs []NeedRestartProcess `json:",omitempty" bson:",omitempty"`
 }
 
 // FQPN returns Fully-Qualified-Package-Name
@@ -177,23 +177,23 @@ func (p Package) FormatChangelog() string {
 // Changelog has contents of changelog and how to get it.
 // Method: models.detectionMethodStr
 type Changelog struct {
-	Contents string          `json:"contents"`
-	Method   DetectionMethod `json:"method"`
+	Contents string          `json:"contents" bson:"contents"`
+	Method   DetectionMethod `json:"method" bson:"method"`
 }
 
 // AffectedProcess keep a processes information affected by software update
 type AffectedProcess struct {
-	PID  string `json:"pid"`
-	Name string `json:"name"`
+	PID  string `json:"pid" bson:"pid"`
+	Name string `json:"name" bson:"name"`
 }
 
 // NeedRestartProcess keep a processes information affected by software update
 type NeedRestartProcess struct {
-	PID         string `json:"pid"`
-	Path        string `json:"path"`
-	ServiceName string `json:"serviceName"`
-	InitSystem  string `json:"initSystem"`
-	HasInit     bool   `json:"-"`
+	PID         string `json:"pid" bson:"pid"`
+	Path        string `json:"path" bson:"path"`
+	ServiceName string `json:"serviceName" bson:"serviceName"`
+	InitSystem  string `json:"initSystem" bson:"initSystem"`
+	HasInit     bool   `json:"-" bson:"-"`
 }
 
 // SrcPackage has installed source package information.
@@ -202,9 +202,9 @@ type NeedRestartProcess struct {
 // so it is also needed to capture source version for OVAL version comparison.
 // https://github.com/future-architect/vuls/issues/504
 type SrcPackage struct {
-	Name        string   `json:"name"`
-	Version     string   `json:"version"`
-	BinaryNames []string `json:"binaryNames"`
+	Name        string   `json:"name" bson:"name"`
+	Version     string   `json:"version" bson:"version"`
+	BinaryNames []string `json:"binaryNames" bson:"binaryNames"`
 }
 
 // AddBinaryName add the name if not exists

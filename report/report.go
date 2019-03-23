@@ -104,8 +104,14 @@ func FillCveInfos(dbclient DBClient, rs []models.ScanResult, dir string) ([]mode
 			r.Config.Report.Servers = map[string]c.ServerInfo{
 				r.ServerName: c.Conf.Servers[r.ServerName],
 			}
-			if err := overwriteJSONFile(dir, r); err != nil {
-				return nil, fmt.Errorf("Failed to write JSON: %s", err)
+		        if c.Conf.FromMongodb {
+				if err := OverWriteJSONToMongo(r); err != nil {
+					return nil, fmt.Errorf("Failed to Insert JSON to Mongodb: %s", err)
+				}
+			} else {
+                                if err := overwriteJSONFile(dir, r); err != nil {
+                                        return nil, fmt.Errorf("Failed to write JSON: %s", err)
+                                }
 			}
 			filledResults = append(filledResults, r)
 		} else {

@@ -43,6 +43,7 @@ type ReportCmd struct {
 	gostConf    c.GostConf
 	exploitConf c.ExploitConf
 	httpConf    c.HTTPConf
+	mongodbConf c.MongodbConf
 }
 
 // Name return subcommand name
@@ -76,6 +77,8 @@ func (*ReportCmd) Usage() string {
 		[-to-s3]
 		[-to-azure-blob]
 		[-to-saas]
+		[-to-mongodb]
+		[-from-mongodb]
 		[-format-json]
 		[-format-xml]
 		[-format-one-email]
@@ -100,6 +103,9 @@ func (*ReportCmd) Usage() string {
 		[-exploitdb-type=sqlite3|mysql|redis|http]
 		[-exploitdb-sqlite3-path=/path/to/exploitdb.sqlite3]
 		[-exploitdb-url=http://127.0.0.1:1326 or DB connection string]
+		[-mongodb-uri=mongodb://mongodb0.example.com:27017/admin]
+		[-mongodb-db=vuls]
+		[-mongodb-collection=result]
 		[-http="http://vuls-report-server"]
 
 		[RFC3339 datetime format under results dir]
@@ -164,6 +170,8 @@ func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&c.Conf.ToLocalFile, "to-localfile", false, "Write report to localfile")
 	f.BoolVar(&c.Conf.ToS3, "to-s3", false,
 		"Write report to S3 (bucket/yyyyMMdd_HHmm/servername.json/xml/txt)")
+	f.BoolVar(&c.Conf.ToMongodb, "to-mongodb", false, "Send report to mongodb")
+	f.BoolVar(&c.Conf.FromMongodb, "from-mongodb", false, "Load scan result from mongodb")
 	f.BoolVar(&c.Conf.ToHTTP, "to-http", false, "Send report via HTTP POST")
 	f.BoolVar(&c.Conf.ToAzureBlob, "to-azure-blob", false,
 		"Write report to Azure Storage blob (container/yyyyMMdd_HHmm/servername.json/xml/txt)")
@@ -199,6 +207,12 @@ func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&p.exploitConf.URL, "exploitdb-url", "",
 		"http://exploit.com:1326 or DB connection string")
 
+	f.StringVar(&p.mongodbConf.URI, "mongodb-uri", "",
+		"mongodb://mongodb0.example.com:27017/admin")
+	f.StringVar(&p.mongodbConf.DB, "mongodb-db", "", "Mongodb DB Name.")
+	f.StringVar(&p.mongodbConf.Collection, "mongodb-collect", "",
+		"mongodb Collection Name")
+
 	f.StringVar(&p.httpConf.URL, "http", "", "-to-http http://vuls-report")
 
 }
@@ -218,13 +232,16 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	c.Conf.Gost.Overwrite(p.gostConf)
 	c.Conf.Exploit.Overwrite(p.exploitConf)
 	c.Conf.HTTP.Overwrite(p.httpConf)
+	c.Conf.Mongodb.Overwrite(p.mongodbConf)
 
 	var dir string
 	var err error
-	if c.Conf.Diff {
-		dir, err = report.JSONDir([]string{})
-	} else {
-		dir, err = report.JSONDir(f.Args())
+	if !c.Conf.FromMongodb {
+		if c.Conf.Diff {
+			dir, err = report.JSONDir([]string{})
+		} else {
+			dir, err = report.JSONDir(f.Args())
+		}
 	}
 	if err != nil {
 		util.Log.Errorf("Failed to read from JSON: %s", err)
@@ -283,6 +300,10 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 		reports = append(reports, report.S3Writer{})
 	}
 
+	if c.Conf.ToMongodb && !c.Conf.FromMongodb {
+		reports = append(reports, report.MongodbWriter{})
+	}
+
 	if c.Conf.ToAzureBlob {
 		if len(c.Conf.Azure.AccountName) == 0 {
 			c.Conf.Azure.AccountName = os.Getenv("AZURE_STORAGE_ACCOUNT")
@@ -323,11 +344,22 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	}
 
 	var loaded models.ScanResults
-	if loaded, err = report.LoadScanResults(dir); err != nil {
-		util.Log.Error(err)
-		return subcommands.ExitFailure
+
+	if c.Conf.FromMongodb {
+	        if loaded, err = report.LoadScanResultsFromMongo(c.Conf.Mongodb.URI, c.Conf.Mongodb.DB , c.Conf.Mongodb.Collection); err != nil {
+        	        util.Log.Error(err)
+                	return subcommands.ExitFailure
+	        }
+		util.Log.Infof("Loaded Result From Mongodb : %s %s %s", c.Conf.Mongodb.URI, c.Conf.Mongodb.DB , c.Conf.Mongodb.Collection)
+	} else {
+
+		if loaded, err = report.LoadScanResults(dir); err != nil {
+			util.Log.Error(err)
+			return subcommands.ExitFailure
+		}
+		util.Log.Infof("Loaded: %s", dir)
 	}
-	util.Log.Infof("Loaded: %s", dir)
+
 
 	var res models.ScanResults
 	for _, r := range loaded {

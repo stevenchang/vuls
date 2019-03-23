@@ -29,12 +29,16 @@ import (
 	"sort"
 	"strings"
 	"time"
+        "context"
 
 	"github.com/future-architect/vuls/config"
 	"github.com/future-architect/vuls/models"
 	"github.com/future-architect/vuls/util"
 	"github.com/gosuri/uitable"
 	"github.com/olekukonko/tablewriter"
+        "github.com/mongodb/mongo-go-driver/bson"
+        "github.com/mongodb/mongo-go-driver/mongo"
+
 )
 
 const maxColWidth = 100
@@ -625,3 +629,63 @@ func loadOneServerScanResult(jsonFile string) (*models.ScanResult, error) {
 	}
 	return result, nil
 }
+
+// LoadScanResultsFromMongo read JSON data from Mongodb
+func LoadScanResultsFromMongo(uri string,db string,collection string) (results models.ScanResults, err error) {
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	client, err := mongo.Connect(ctx, uri)
+	defer cancel()
+
+        if err != nil {
+            util.Log.Errorf("%s", err)
+        }
+
+        // Check the connection
+	err = client.Ping(ctx, nil)
+
+        if err != nil {
+            util.Log.Errorf("%s", err)
+        }
+
+	cur,err := client.Database(db).Collection(collection).Find(ctx, bson.D{})
+
+	if err != nil { util.Log.Errorf("%s", err) }
+
+	for cur.Next(ctx) {
+	   var r *models.ScanResult
+	   err := cur.Decode(&r)
+	   if err != nil { util.Log.Errorf("%s", err) }
+	   results = append(results, *r)
+	}
+
+	defer cur.Close(ctx)
+
+	defer client.Disconnect(context.TODO())
+	if err := cur.Err(); err != nil {
+	  util.Log.Errorf("%s", err)
+	}
+
+        if len(results) == 0 {
+                return nil, fmt.Errorf("There is no Document in Mongodb under %s", db)
+        }
+        return
+}
+
+// OverWriteJSONToMongo JSON data into Mongodb
+func OverWriteJSONToMongo(r models.ScanResult) error {
+
+        before := config.Conf.FormatJSON
+        beforeDiff := config.Conf.Diff
+        config.Conf.FormatJSON = true
+        config.Conf.Diff = false
+        w := MongodbWriter{}
+        if err := w.Write(r); err != nil {
+                return fmt.Errorf("Failed to insert summary report to Mongodb: %s", err)
+        }
+        config.Conf.FormatJSON = before
+        config.Conf.Diff = beforeDiff
+        return nil
+}
+
+

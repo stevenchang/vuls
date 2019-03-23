@@ -138,6 +138,7 @@ type Config struct {
 	ChatWork ChatWorkConf `json:"-"`
 	Telegram TelegramConf `json:"-"`
 	Saas     SaasConf     `json:"-"`
+	Mongodb  MongodbConf  `json:"-"`
 
 	RefreshCve        bool `json:"refreshCve,omitempty"`
 	ToSlack           bool `json:"toSlack,omitempty"`
@@ -149,6 +150,8 @@ type Config struct {
 	ToSyslog          bool `json:"toSyslog,omitempty"`
 	ToLocalFile       bool `json:"toLocalFile,omitempty"`
 	ToS3              bool `json:"toS3,omitempty"`
+	ToMongodb         bool `json:"toMongodb,omitempty"`
+	FromMongodb       bool `json:"fromMongodb,omitempty"`
 	ToAzureBlob       bool `json:"toAzureBlob,omitempty"`
 	ToSaas            bool `json:"toSaas,omitempty"`
 	ToHTTP            bool `json:"toHTTP,omitempty"`
@@ -798,6 +801,62 @@ func (cnf *GoCveDictConf) setDefault() {
 	}
 }
 
+const mongoURIKey = "VULS_MONGO_URI"
+const mongoDBKey = "VULS_MONGO_DB"
+const mongoCollectKey = "VULS_MONGO_COLLECT"
+
+// MongodbConf is Mongodb config
+type MongodbConf struct {
+	// DB name
+	DB string `json:"-" bson:"-"`
+
+	// Collection
+	Collection string `json:"-" bson:"-"`
+
+        // mongodb://mongodb0.example.com:27017/admin
+        URI string `json:"-" bson:"-"`
+
+}
+
+func (cnf *MongodbConf) setDefault() {
+        if cnf.URI == "" {
+                cnf.URI = "mongodb://mongodb0.example.com:27017/admin"
+        }
+        if cnf.DB == "" {
+                cnf.DB = "vuls"
+        }
+	if cnf.Collection == "" {
+		cnf.Collection = "result"
+	}
+}
+
+// Overwrite set options with the following priority.
+// 1. Command line option
+// 2. Environment variable
+// 3. config.toml
+func (cnf *MongodbConf) Overwrite(cmdOpt MongodbConf) {
+        if os.Getenv(mongoURIKey) != "" {
+                cnf.URI = os.Getenv(mongoURIKey)
+        }
+        if cmdOpt.URI != "" {
+                cnf.URI = cmdOpt.URI
+        }
+        if os.Getenv(mongoDBKey) != "" {
+                cnf.DB = os.Getenv(mongoDBKey)
+        }
+        if cmdOpt.DB != "" {
+                cnf.DB = cmdOpt.DB
+        }
+        if os.Getenv(mongoCollectKey) != "" {
+                cnf.Collection = os.Getenv(mongoCollectKey)
+        }
+        if cmdOpt.Collection != "" {
+                cnf.Collection = cmdOpt.Collection
+        }
+
+}
+
+
 const cveDBType = "CVEDB_TYPE"
 const cveDBURL = "CVEDB_URL"
 const cveDBPATH = "CVEDB_SQLITE3_PATH"
@@ -841,10 +900,10 @@ type GovalDictConf struct {
 	Type string
 
 	// http://goval-dictionary.com:1324 or DB connection string
-	URL string `json:"-"`
+	URL string `json:"-" bson:"-"`
 
 	// /path/to/oval.sqlite3
-	SQLite3Path string `json:"-"`
+	SQLite3Path string `json:"-" bson:"-"`
 }
 
 func (cnf *GovalDictConf) setDefault() {
@@ -899,10 +958,10 @@ type GostConf struct {
 	Type string
 
 	// http://gost-dictionary.com:1324 or DB connection string
-	URL string `json:"-"`
+	URL string `json:"-" bson:"-"`
 
 	// /path/to/gost.sqlite3
-	SQLite3Path string `json:"-"`
+	SQLite3Path string `json:"-" bson:"-"`
 }
 
 func (cnf *GostConf) setDefault() {
@@ -957,10 +1016,10 @@ type ExploitConf struct {
 	Type string
 
 	// http://exploit-dictionary.com:1324 or DB connection string
-	URL string `json:"-"`
+	URL string `json:"-" bson:"-"`
 
 	// /path/to/exploit.sqlite3
-	SQLite3Path string `json:"-"`
+	SQLite3Path string `json:"-" bson:"-"`
 }
 
 func (cnf *ExploitConf) setDefault() {
@@ -1012,73 +1071,73 @@ func (cnf *ExploitConf) IsFetchViaHTTP() bool {
 // AWS is aws config
 type AWS struct {
 	// AWS profile to use
-	Profile string `json:"profile"`
+	Profile string `json:"profile" bson:"profile"`
 
 	// AWS region to use
-	Region string `json:"region"`
+	Region string `json:"region" bson:"region"`
 
 	// S3 bucket name
-	S3Bucket string `json:"s3Bucket"`
+	S3Bucket string `json:"s3Bucket" bson:"s3Bucket"`
 
 	// /bucket/path/to/results
-	S3ResultsDir string `json:"s3ResultsDir"`
+	S3ResultsDir string `json:"s3ResultsDir" bson:"s3ResultsDir"`
 
 	// The Server-side encryption algorithm used when storing the reports in S3 (e.g., AES256, aws:kms).
-	S3ServerSideEncryption string `json:"s3ServerSideEncryption"`
+	S3ServerSideEncryption string `json:"s3ServerSideEncryption" bson:"s3ServerSideEncryption"`
 }
 
 // Azure is azure config
 type Azure struct {
 	// Azure account name to use. AZURE_STORAGE_ACCOUNT environment variable is used if not specified
-	AccountName string `json:"accountName"`
+	AccountName string `json:"accountName" bson:"accountName"`
 
 	// Azure account key to use. AZURE_STORAGE_ACCESS_KEY environment variable is used if not specified
-	AccountKey string `json:"-"`
+	AccountKey string `json:"-" bson:"-"`
 
 	// Azure storage container name
-	ContainerName string `json:"containerName"`
+	ContainerName string `json:"containerName" bson:"containerName"`
 }
 
 // ServerInfo has SSH Info, additional CPE packages to scan.
 type ServerInfo struct {
-	ServerName             string                      `toml:"-" json:"serverName"`
-	User                   string                      `toml:"user,omitempty" json:"user"`
-	Host                   string                      `toml:"host,omitempty" json:"host"`
-	Port                   string                      `toml:"port,omitempty" json:"port"`
-	KeyPath                string                      `toml:"keyPath,omitempty" json:"keyPath"`
-	KeyPassword            string                      `json:"-" toml:"-"`
-	CpeNames               []string                    `toml:"cpeNames,omitempty" json:"cpeNames,omitempty"`
-	ScanMode               []string                    `toml:"scanMode,omitempty" json:"scanMode,omitempty"`
-	DependencyCheckXMLPath string                      `toml:"dependencyCheckXMLPath,omitempty" json:"-"` // TODO Deprecated remove in near future
-	OwaspDCXMLPath         string                      `toml:"owaspDCXMLPath,omitempty" json:"owaspDCXMLPath"`
-	ContainersIncluded     []string                    `toml:"containersIncluded,omitempty" json:"containersIncluded,omitempty"`
-	ContainersExcluded     []string                    `toml:"containersExcluded,omitempty" json:"containersExcluded,omitempty"`
-	ContainerType          string                      `toml:"containerType,omitempty" json:"containerType,omitempty"`
-	Containers             map[string]ContainerSetting `toml:"containers" json:"containers,omitempty"`
-	IgnoreCves             []string                    `toml:"ignoreCves,omitempty" json:"ignoreCves,omitempty"`
-	IgnorePkgsRegexp       []string                    `toml:"ignorePkgsRegexp,omitempty" json:"ignorePkgsRegexp,omitempty"`
-	GitHubRepos            map[string]GitHubConf       `toml:"githubs" json:"githubs,omitempty"` // key: owner/repo
-	UUIDs                  map[string]string           `toml:"uuids,omitempty" json:"uuids,omitempty"`
-	Memo                   string                      `toml:"memo,omitempty" json:"memo"`
-	Enablerepo             []string                    `toml:"enablerepo,omitempty" json:"enablerepo,omitempty"` // For CentOS, RHEL, Amazon
-	Optional               map[string]interface{}      `toml:"optional,omitempty" json:"optional,omitempty"`     // Optional key-value set that will be outputted to JSON
-	Type                   string                      `toml:"type,omitempty" json:"type"`                       // "pseudo" or ""
-	IPv4Addrs              []string                    `toml:"-" json:"ipv4Addrs,omitempty"`
-	IPv6Addrs              []string                    `toml:"-" json:"ipv6Addrs,omitempty"`
+	ServerName             string                      `toml:"-" json:"serverName" bson:"serverName"`
+	User                   string                      `toml:"user,omitempty" json:"user" bson:"user"`
+	Host                   string                      `toml:"host,omitempty" json:"host" bson:"host"`
+	Port                   string                      `toml:"port,omitempty" json:"port" bson:"port"`
+	KeyPath                string                      `toml:"keyPath,omitempty" json:"keyPath" bson:"keyPath"`
+	KeyPassword            string                      `json:"-" toml:"-" bson:"-"`
+	CpeNames               []string                    `toml:"cpeNames,omitempty" json:"cpeNames,omitempty" bson:"cpeNames,omitempty"`
+	ScanMode               []string                    `toml:"scanMode,omitempty" json:"scanMode,omitempty" bson:"scanMode,omitempty"`
+	DependencyCheckXMLPath string                      `toml:"dependencyCheckXMLPath,omitempty" json:"-" bson:"-"` // TODO Deprecated remove in near future
+	OwaspDCXMLPath         string                      `toml:"owaspDCXMLPath,omitempty" json:"owaspDCXMLPath" bson:"owaspDCXMLPath"`
+	ContainersIncluded     []string                    `toml:"containersIncluded,omitempty" json:"containersIncluded,omitempty" bson:"containersIncluded,omitempty"`
+	ContainersExcluded     []string                    `toml:"containersExcluded,omitempty" json:"containersExcluded,omitempty" bson:"containersExcluded,omitempty"`
+	ContainerType          string                      `toml:"containerType,omitempty" json:"containerType,omitempty" bson:"containerType,omitempty"`
+	Containers             map[string]ContainerSetting `toml:"containers" json:"containers,omitempty" bson:"containers,omitempty"`
+	IgnoreCves             []string                    `toml:"ignoreCves,omitempty" json:"ignoreCves,omitempty" bson:"ignoreCves,omitempty"`
+	IgnorePkgsRegexp       []string                    `toml:"ignorePkgsRegexp,omitempty" json:"ignorePkgsRegexp,omitempty" bson:"ignorePkgsRegexp,omitempty"`
+	GitHubRepos            map[string]GitHubConf       `toml:"githubs" json:"githubs,omitempty" bson:"githubs,omitempty"` // key: owner/repo
+	UUIDs                  map[string]string           `toml:"uuids,omitempty" json:"uuids,omitempty" bson:"uuids,omitempty"`
+	Memo                   string                      `toml:"memo,omitempty" json:"memo" bson:"memo"`
+	Enablerepo             []string                    `toml:"enablerepo,omitempty" json:"enablerepo,omitempty" bson:"enablerepo,omitempty"` // For CentOS, RHEL, Amazon
+	Optional               map[string]interface{}      `toml:"optional,omitempty" json:"optional,omitempty" bson:"optional,omitempty"`     // Optional key-value set that will be outputted to JSON
+	Type                   string                      `toml:"type,omitempty" json:"type" bson:"type"`                       // "pseudo" or ""
+	IPv4Addrs              []string                    `toml:"-" json:"ipv4Addrs,omitempty" bson:"ipv4Addrs,omitempty"`
+	IPv6Addrs              []string                    `toml:"-" json:"ipv6Addrs,omitempty" bson:"ipv6Addrs,omitempty"`
 
 	// used internal
-	LogMsgAnsiColor string    `toml:"-" json:"-"` // DebugLog Color
-	Container       Container `toml:"-" json:"-"`
-	Distro          Distro    `toml:"-" json:"-"`
-	Mode            ScanMode  `toml:"-" json:"-"`
+	LogMsgAnsiColor string    `toml:"-" json:"-" bson:"-"` // DebugLog Color
+	Container       Container `toml:"-" json:"-" bson:"-"`
+	Distro          Distro    `toml:"-" json:"-" bson:"-"`
+	Mode            ScanMode  `toml:"-" json:"-" bson:"-"`
 }
 
 // ContainerSetting is used for loading container setting in config.toml
 type ContainerSetting struct {
-	Cpes             []string `json:"cpes,omitempty"`
-	OwaspDCXMLPath   string   `json:"owaspDCXMLPath"`
-	IgnorePkgsRegexp []string `json:"ignorePkgsRegexp,omitempty"`
-	IgnoreCves       []string `json:"ignoreCves,omitempty"`
+	Cpes             []string `json:"cpes,omitempty" bson:"cpes,omitempty"`
+	OwaspDCXMLPath   string   `json:"owaspDCXMLPath" bson:"owaspDCXMLPath"`
+	IgnorePkgsRegexp []string `json:"ignorePkgsRegexp,omitempty" bson:"ignorePkgsRegexp,omitempty"`
+	IgnoreCves       []string `json:"ignoreCves,omitempty" bson:"ignoreCves,omitempty"`
 }
 
 // IntegrationConf is used for integration configuration
@@ -1095,7 +1154,7 @@ func (c IntegrationConf) New() IntegrationConf {
 
 // GitHubConf is used for GitHub integration
 type GitHubConf struct {
-	Token string `json:"token"`
+	Token string `json:"token" bson:"token"`
 }
 
 // ScanMode has a type of scan mode. fast, fast-root, deep and offline

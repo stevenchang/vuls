@@ -156,23 +156,23 @@ func (ps PackageStatuses) Sort() {
 
 // PackageStatus has name and other status abount the package
 type PackageStatus struct {
-	Name        string `json:"name"`
-	NotFixedYet bool   `json:"notFixedYet"`
-	FixState    string `json:"fixState"`
+	Name        string `json:"name" bson:"name"`
+	NotFixedYet bool   `json:"notFixedYet" bson:"notFixedYet"`
+	FixState    string `json:"fixState" bson:"fixState"`
 }
 
 // VulnInfo has a vulnerability information and unsecure packages
 type VulnInfo struct {
-	CveID            string           `json:"cveID,omitempty"`
-	Confidences      Confidences      `json:"confidences,omitempty"`
-	AffectedPackages PackageStatuses  `json:"affectedPackages,omitempty"`
-	DistroAdvisories []DistroAdvisory `json:"distroAdvisories,omitempty"` // for Aamazon, RHEL, FreeBSD
-	CveContents      CveContents      `json:"cveContents,omitempty"`
-	Exploits         []Exploit        `json:"exploits,omitempty"`
-	AlertDict        AlertDict        `json:"alertDict,omitempty"`
+	CveID            string           `json:"cveID,omitempty" bson:"cveID,omitempty"`
+	Confidences      Confidences      `json:"confidences,omitempty" bson:"confidences,omitempty"`
+	AffectedPackages PackageStatuses  `json:"affectedPackages,omitempty" bson:"affectedPackages,omitempty"`
+	DistroAdvisories []DistroAdvisory `json:"distroAdvisories,omitempty" bson:"distroAdvisories,omitempty"` // for Aamazon, RHEL, FreeBSD
+	CveContents      CveContents      `json:"cveContents,omitempty" bson:"cveContents,omitempty"`
+	Exploits         []Exploit        `json:"exploits,omitempty" bson:"exploits,omitempty"`
+	AlertDict        AlertDict        `json:"alertDict,omitempty" bson:"alertDict,omitempty"`
 
-	CpeURIs              []string             `json:"cpeURIs,omitempty"` // CpeURIs related to this CVE defined in config.toml
-	GitHubSecurityAlerts GitHubSecurityAlerts `json:"gitHubSecurityAlerts,omitempty"`
+	CpeURIs              []string             `json:"cpeURIs,omitempty" bson:"cpeURIs,omitempty"` // CpeURIs related to this CVE defined in config.toml
+	GitHubSecurityAlerts GitHubSecurityAlerts `json:"gitHubSecurityAlerts,omitempty" bson:"gitHubSecurityAlerts,omitempty"`
 }
 
 // GitHubSecurityAlerts is a list of GitHubSecurityAlert
@@ -198,12 +198,12 @@ func (g GitHubSecurityAlerts) String() string {
 
 // GitHubSecurityAlert has detected CVE-ID, PackageName, Status fetched via GitHub API
 type GitHubSecurityAlert struct {
-	PackageName   string    `json:"packageName"`
-	FixedIn       string    `json:"fixedIn"`
-	AffectedRange string    `json:"affectedRange"`
-	Dismissed     bool      `json:"dismissed"`
-	DismissedAt   time.Time `json:"dismissedAt"`
-	DismissReason string    `json:"dismissReason"`
+	PackageName   string    `json:"packageName" bson:"packageName"`
+	FixedIn       string    `json:"fixedIn" bson:"fixedIn"`
+	AffectedRange string    `json:"affectedRange" bson:"affectedRange"`
+	Dismissed     bool      `json:"dismissed" bson:"dismissed"`
+	DismissedAt   time.Time `json:"dismissedAt" bson:"dismissedAt"`
+	DismissReason string    `json:"dismissReason" bson:"dismissReason"`
 }
 
 // Titles returns tilte (TUI)
@@ -553,8 +553,8 @@ func (v VulnInfo) PatchStatus(packs Packages) string {
 
 // CveContentCvss has CVSS information
 type CveContentCvss struct {
-	Type  CveContentType `json:"type"`
-	Value Cvss           `json:"value"`
+	Type  CveContentType `json:"type" bson:"type"`
+	Value Cvss           `json:"value" bson:"value"`
 }
 
 // CvssType Represent the type of CVSS
@@ -570,11 +570,11 @@ const (
 
 // Cvss has CVSS Score
 type Cvss struct {
-	Type                 CvssType `json:"type"`
-	Score                float64  `json:"score"`
-	CalculatedBySeverity bool     `json:"calculatedBySeverity"`
-	Vector               string   `json:"vector"`
-	Severity             string   `json:"severity"`
+	Type                 CvssType `json:"type" bson:"type"`
+	Score                float64  `json:"score" bson:"score"`
+	CalculatedBySeverity bool     `json:"calculatedBySeverity" bson:"calculatedBySeverity"`
+	Vector               string   `json:"vector" bson:"vector"`
+	Severity             string   `json:"severity" bson:"severity"`
 }
 
 // Format CVSS Score and Vector
@@ -689,11 +689,11 @@ func (v VulnInfo) VendorLinks(family string) map[string]string {
 
 // DistroAdvisory has Amazon Linux, RHEL, FreeBSD Security Advisory information.
 type DistroAdvisory struct {
-	AdvisoryID  string    `json:"advisoryID"`
-	Severity    string    `json:"severity"`
-	Issued      time.Time `json:"issued"`
-	Updated     time.Time `json:"updated"`
-	Description string    `json:"description"`
+	AdvisoryID  string    `json:"advisoryID" bson:"advisoryID"`
+	Severity    string    `json:"severity" bson:"severity"`
+	Issued      time.Time `json:"issued" bson:"issued"`
+	Updated     time.Time `json:"updated" bson:"updated"`
+	Description string    `json:"description" bson:"description"`
 }
 
 // Format the distro advisory information
@@ -712,19 +712,19 @@ func (p DistroAdvisory) Format() string {
 
 // Exploit :
 type Exploit struct {
-	ExploitType  exploitmodels.ExploitType `json:"exploitType"`
-	ID           string                    `json:"id"`
-	URL          string                    `json:"url"`
-	Description  string                    `json:"description"`
-	DocumentURL  *string                   `json:"documentURL,omitempty"`
-	ShellCodeURL *string                   `json:"shellCodeURL,omitempty"`
-	BinaryURL    *string                   `json:"binaryURL,omitempty"`
+	ExploitType  exploitmodels.ExploitType `json:"exploitType" bson:"exploitType"`
+	ID           string                    `json:"id" bson:"id"`
+	URL          string                    `json:"url" bson:"url"`
+	Description  string                    `json:"description" bson:"description"`
+	DocumentURL  *string                   `json:"documentURL,omitempty" bson:"documentURL,omitempty"`
+	ShellCodeURL *string                   `json:"shellCodeURL,omitempty" bson:"shellCodeURL,omitempty"`
+	BinaryURL    *string                   `json:"binaryURL,omitempty" bson:"binaryURL,omitempty"`
 }
 
 // AlertDict has target cve's JPCERT and USCERT alert data
 type AlertDict struct {
-	Ja []alert.Alert `json:"ja"`
-	En []alert.Alert `json:"en"`
+	Ja []alert.Alert `json:"ja" bson:"ja"`
+	En []alert.Alert `json:"en" bson:"en"`
 }
 
 // HasAlert returns whether or not it has En or Ja entries.
@@ -768,9 +768,9 @@ func (cs Confidences) SortByConfident() Confidences {
 // Confidence is a ranking how confident the CVE-ID was deteted correctly
 // Score: 0 - 100
 type Confidence struct {
-	Score           int             `json:"score"`
-	DetectionMethod DetectionMethod `json:"detectionMethod"`
-	SortOrder       int             `json:"-"`
+	Score           int             `json:"score" bson:"score"`
+	DetectionMethod DetectionMethod `json:"detectionMethod" bson:"detectionMethod"`
+	SortOrder       int             `json:"-" bson:"-"`
 }
 
 func (c Confidence) String() string {

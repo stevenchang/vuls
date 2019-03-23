@@ -108,7 +108,7 @@ type CveContentCpes struct {
 // Cpes returns affected CPEs of this Vulnerability
 func (v CveContents) Cpes(myFamily string) (values []CveContentCpes) {
 	order := CveContentTypes{NewCveContentType(myFamily)}
-	order = append(order, AllCveContetTypes.Except(order...)...)
+	order = append(order, AllCveContetTypes.Except(append(order)...)...)
 
 	for _, ctype := range order {
 		if cont, found := v[ctype]; found && 0 < len(cont.Cpes) {
@@ -130,7 +130,7 @@ type CveContentRefs struct {
 // References returns References
 func (v CveContents) References(myFamily string) (values []CveContentRefs) {
 	order := CveContentTypes{NewCveContentType(myFamily)}
-	order = append(order, AllCveContetTypes.Except(order...)...)
+	order = append(order, AllCveContetTypes.Except(append(order)...)...)
 
 	for _, ctype := range order {
 		if cont, found := v[ctype]; found && 0 < len(cont.References) {
@@ -146,7 +146,7 @@ func (v CveContents) References(myFamily string) (values []CveContentRefs) {
 // CweIDs returns related CweIDs of the vulnerability
 func (v CveContents) CweIDs(myFamily string) (values []CveContentStr) {
 	order := CveContentTypes{NewCveContentType(myFamily)}
-	order = append(order, AllCveContetTypes.Except(order...)...)
+	order = append(order, AllCveContetTypes.Except(append(order)...)...)
 	for _, ctype := range order {
 		if cont, found := v[ctype]; found && 0 < len(cont.CweIDs) {
 			for _, cweID := range cont.CweIDs {
@@ -179,24 +179,24 @@ func (v CveContents) UniqCweIDs(myFamily string) (values []CveContentStr) {
 
 // CveContent has abstraction of various vulnerability information
 type CveContent struct {
-	Type          CveContentType    `json:"type"`
-	CveID         string            `json:"cveID"`
-	Title         string            `json:"title"`
-	Summary       string            `json:"summary"`
-	Cvss2Score    float64           `json:"cvss2Score"`
-	Cvss2Vector   string            `json:"cvss2Vector"`
-	Cvss2Severity string            `json:"cvss2Severity"`
-	Cvss3Score    float64           `json:"cvss3Score"`
-	Cvss3Vector   string            `json:"cvss3Vector"`
-	Cvss3Severity string            `json:"cvss3Severity"`
-	SourceLink    string            `json:"sourceLink"`
-	Cpes          []Cpe             `json:"cpes,omitempty"`
-	References    References        `json:"references,omitempty"`
-	CweIDs        []string          `json:"cweIDs,omitempty"`
-	Published     time.Time         `json:"published"`
-	LastModified  time.Time         `json:"lastModified"`
-	Mitigation    string            `json:"mitigation"` // RedHat API
-	Optional      map[string]string `json:"optional,omitempty"`
+	Type          CveContentType    `json:"type" bson:"type"`
+	CveID         string            `json:"cveID" bson:"cveID"`
+	Title         string            `json:"title" bson:"title"`
+	Summary       string            `json:"summary" bson:"summary"`
+	Cvss2Score    float64           `json:"cvss2Score" bson:"cvss2Score"`
+	Cvss2Vector   string            `json:"cvss2Vector" bson:"cvss2Vector"`
+	Cvss2Severity string            `json:"cvss2Severity" bson:"cvss2Severity"`
+	Cvss3Score    float64           `json:"cvss3Score" bson:"cvss3Score"`
+	Cvss3Vector   string            `json:"cvss3Vector" bson:"cvss3Vector"`
+	Cvss3Severity string            `json:"cvss3Severity" bson:"cvss3Severity"`
+	SourceLink    string            `json:"sourceLink" bson:"sourceLink"`
+	Cpes          []Cpe             `json:"cpes,omitempty" bson:"cpes,omitempty"`
+	References    References        `json:"references,omitempty" bson:"references,omitempty"`
+	CweIDs        []string          `json:"cweIDs,omitempty" bson:"cweIDs,omitempty"`
+	Published     time.Time         `json:"published" bson:"published"`
+	LastModified  time.Time         `json:"lastModified" bson:"lastModified"`
+	Mitigation    string            `json:"mitigation" bson:"mitigation"` // RedHat API
+	Optional      map[string]string `json:"optional,omitempty" bson:"optional,omitempty"`
 }
 
 // Empty checks the content is empty
@@ -307,8 +307,8 @@ func (c CveContentTypes) Except(excepts ...CveContentType) (excepted CveContentT
 
 // Cpe is Common Platform Enumeration
 type Cpe struct {
-	URI             string `json:"uri"`
-	FormattedString string `json:"formattedString"`
+	URI             string `json:"uri" bson:"uri"`
+	FormattedString string `json:"formattedString" bson:"formattedString"`
 }
 
 // References is a slice of Reference
@@ -316,7 +316,7 @@ type References []Reference
 
 // Reference has a related link of the CVE
 type Reference struct {
-	Source string `json:"source"`
-	Link   string `json:"link"`
-	RefID  string `json:"refID"`
+	Source string `json:"source" bson:"source"`
+	Link   string `json:"link" bson:"link"`
+	RefID  string `json:"refID" bson:"refID"`
 }
