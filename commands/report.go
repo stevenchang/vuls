@@ -350,7 +350,7 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
         	        util.Log.Error(err)
                 	return subcommands.ExitFailure
 	        }
-		util.Log.Infof("Loaded Result From Mongodb : %s %s %s", c.Conf.Mongodb.URI, c.Conf.Mongodb.DB , c.Conf.Mongodb.Collection)
+		util.Log.Infof("Loaded Result From Mongodb : %s %s", c.Conf.Mongodb.DB , c.Conf.Mongodb.Collection)
 	} else {
 
 		if loaded, err = report.LoadScanResults(dir); err != nil {

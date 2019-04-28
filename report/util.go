@@ -652,19 +652,20 @@ func LoadScanResultsFromMongo(uri string,db string,collection string) (results m
 
 	if err != nil { util.Log.Errorf("%s", err) }
 
-	for cur.Next(ctx) {
+	util.Log.Info("Starting load server data... ")
+	for cur.Next(context.Background()) {
 	   var r *models.ScanResult
 	   err := cur.Decode(&r)
-	   if err != nil { util.Log.Errorf("%s", err) }
-	   results = append(results, *r)
+	   if err != nil { 
+		util.Log.Errorf("Load data from cursor : %s", err) 
+	   } else {
+	   	results = append(results, *r)
+	   }
 	}
 
-	defer cur.Close(ctx)
+	defer cur.Close(context.Background())
 
 	defer client.Disconnect(context.TODO())
-	if err := cur.Err(); err != nil {
-	  util.Log.Errorf("%s", err)
-	}
 
         if len(results) == 0 {
                 return nil, fmt.Errorf("There is no Document in Mongodb under %s", db)
