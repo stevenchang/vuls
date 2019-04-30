@@ -1,7 +1,6 @@
 package report
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/future-architect/vuls/config"
@@ -10,6 +9,7 @@ import (
 	cvedb "github.com/kotakanbe/go-cve-dictionary/db"
 	ovaldb "github.com/kotakanbe/goval-dictionary/db"
 	exploitdb "github.com/mozqnet/go-exploitdb/db"
+	"golang.org/x/xerrors"
 )
 
 // DBClient is a dictionarie's db client for reporting
@@ -33,7 +33,7 @@ type DBClientConf struct {
 func NewDBClient(cnf DBClientConf) (dbclient *DBClient, locked bool, err error) {
 	cveDriver, locked, err := NewCveDB(cnf)
 	if locked {
-		return nil, true, fmt.Errorf("CveDB is locked: %s",
+		return nil, true, xerrors.Errorf("CveDB is locked: %s",
 			cnf.OvalDictCnf.SQLite3Path)
 	} else if err != nil {
 		return nil, locked, err
@@ -41,7 +41,7 @@ func NewDBClient(cnf DBClientConf) (dbclient *DBClient, locked bool, err error) 
 
 	ovaldb, locked, err := NewOvalDB(cnf)
 	if locked {
-		return nil, true, fmt.Errorf("OvalDB is locked: %s",
+		return nil, true, xerrors.Errorf("OvalDB is locked: %s",
 			cnf.OvalDictCnf.SQLite3Path)
 	} else if err != nil {
 		util.Log.Warnf("Unable to use OvalDB: %s, err: %s",
@@ -50,7 +50,7 @@ func NewDBClient(cnf DBClientConf) (dbclient *DBClient, locked bool, err error) 
 
 	gostdb, locked, err := NewGostDB(cnf)
 	if locked {
-		return nil, true, fmt.Errorf("gostDB is locked: %s",
+		return nil, true, xerrors.Errorf("gostDB is locked: %s",
 			cnf.GostCnf.SQLite3Path)
 	} else if err != nil {
 		util.Log.Warnf("Unable to use gostDB: %s, err: %s",
@@ -59,7 +59,7 @@ func NewDBClient(cnf DBClientConf) (dbclient *DBClient, locked bool, err error) 
 
 	exploitdb, locked, err := NewExploitDB(cnf)
 	if locked {
-		return nil, true, fmt.Errorf("exploitDB is locked: %s",
+		return nil, true, xerrors.Errorf("exploitDB is locked: %s",
 			cnf.ExploitCnf.SQLite3Path)
 	} else if err != nil {
 		util.Log.Warnf("Unable to use exploitDB: %s, err: %s",
@@ -88,7 +88,7 @@ func NewCveDB(cnf DBClientConf) (driver cvedb.DB, locked bool, err error) {
 	util.Log.Debugf("Open cve-dictionary db (%s): %s", cnf.CveDictCnf.Type, path)
 	driver, locked, err = cvedb.NewDB(cnf.CveDictCnf.Type, path, cnf.DebugSQL)
 	if err != nil {
-		err = fmt.Errorf("Failed to init CVE DB. err: %s, path: %s", err, path)
+		err = xerrors.Errorf("Failed to init CVE DB. err: %w, path: %s", err, path)
 		return nil, locked, err
 	}
 	return driver, false, nil
@@ -112,7 +112,7 @@ func NewOvalDB(cnf DBClientConf) (driver ovaldb.DB, locked bool, err error) {
 	util.Log.Debugf("Open oval-dictionary db (%s): %s", cnf.OvalDictCnf.Type, path)
 	driver, locked, err = ovaldb.NewDB("", cnf.OvalDictCnf.Type, path, cnf.DebugSQL)
 	if err != nil {
-		err = fmt.Errorf("Failed to new OVAL DB. err: %s", err)
+		err = xerrors.Errorf("Failed to new OVAL DB. err: %w", err)
 		if locked {
 			return nil, true, err
 		}
@@ -139,7 +139,7 @@ func NewGostDB(cnf DBClientConf) (driver gostdb.DB, locked bool, err error) {
 	util.Log.Debugf("Open gost db (%s): %s", cnf.GostCnf.Type, path)
 	if driver, locked, err = gostdb.NewDB(cnf.GostCnf.Type, path, cnf.DebugSQL); err != nil {
 		if locked {
-			util.Log.Errorf("gostDB is locked: %s", err)
+			util.Log.Errorf("gostDB is locked. err: %+v", err)
 			return nil, true, err
 		}
 		return nil, false, err
@@ -165,7 +165,7 @@ func NewExploitDB(cnf DBClientConf) (driver exploitdb.DB, locked bool, err error
 	util.Log.Debugf("Open exploit db (%s): %s", cnf.ExploitCnf.Type, path)
 	if driver, locked, err = exploitdb.NewDB(cnf.ExploitCnf.Type, path, cnf.DebugSQL); err != nil {
 		if locked {
-			util.Log.Errorf("exploitDB is locked: %s", err)
+			util.Log.Errorf("exploitDB is locked. err: %+v", err)
 			return nil, true, err
 		}
 		return nil, false, err
@@ -177,12 +177,12 @@ func NewExploitDB(cnf DBClientConf) (driver exploitdb.DB, locked bool, err error
 func (d DBClient) CloseDB() {
 	if d.CveDB != nil {
 		if err := d.CveDB.CloseDB(); err != nil {
-			util.Log.Errorf("Failed to close DB: %s", err)
+			util.Log.Errorf("Failed to close DB. err: %+v", err)
 		}
 	}
 	if d.OvalDB != nil {
 		if err := d.OvalDB.CloseDB(); err != nil {
-			util.Log.Errorf("Failed to close DB: %s", err)
+			util.Log.Errorf("Failed to close DB. err: %+v", err)
 		}
 	}
 }
