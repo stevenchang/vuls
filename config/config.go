@@ -804,6 +804,10 @@ func (cnf *GoCveDictConf) setDefault() {
 const mongoURIKey = "VULS_MONGO_URI"
 const mongoDBKey = "VULS_MONGO_DB"
 const mongoCollectKey = "VULS_MONGO_COLLECT"
+const mongoThread = "VULS_MONGO_THREAD"
+const mongoPage = "VULS_MONGO_PAGE"
+const mongoPageSize = "VULS_MONGO_PAGE_SIZE"
+const mongoPickupServer = "VULS_MONGO_PICKUP_SERVER"
 
 // MongodbConf is Mongodb config
 type MongodbConf struct {
@@ -816,6 +820,17 @@ type MongodbConf struct {
         // mongodb://mongodb0.example.com:27017/admin
         URI string `json:"-" bson:"-"`
 
+	// Process Data Thread Count
+        ThreadCnt int `json:"-" bson:"-"`
+
+        // Process Data Page
+        PAGE int `json:"-" bson:"-"`
+
+        // Process Data Page Size
+        PAGESIZE int `json:"-" bson:"-"`
+
+	// Pick up Process Server
+	PICKUPSERVER string `json:"-" bson:"-"`
 }
 
 func (cnf *MongodbConf) setDefault() {
@@ -828,6 +843,16 @@ func (cnf *MongodbConf) setDefault() {
 	if cnf.Collection == "" {
 		cnf.Collection = "result"
 	}
+        if cnf.ThreadCnt == 0 {
+                cnf.ThreadCnt = 1
+        }
+        if cnf.PAGE == 0 {
+                cnf.ThreadCnt = 1
+        }
+        if cnf.PAGESIZE == 0 {
+                cnf.ThreadCnt = 0
+        }
+
 }
 
 // Overwrite set options with the following priority.
@@ -853,7 +878,45 @@ func (cnf *MongodbConf) Overwrite(cmdOpt MongodbConf) {
         if cmdOpt.Collection != "" {
                 cnf.Collection = cmdOpt.Collection
         }
-
+        if os.Getenv(mongoThread) != "" {
+	    cnt, err := strconv.Atoi(os.Getenv(mongoThread))
+	    if err != nil {
+		log.Error(err)
+		cnt = 1
+	    }
+            cnf.ThreadCnt = cnt
+        }
+        if cmdOpt.ThreadCnt != 0 {
+                cnf.ThreadCnt = cmdOpt.ThreadCnt
+        }
+        if os.Getenv(mongoPage) != "" {
+            page, err := strconv.Atoi(os.Getenv(mongoPage))
+            if err != nil {
+                log.Error(err)
+                page = 1
+            }
+            cnf.PAGE = page
+        }
+        if cmdOpt.PAGE != 0 {
+                cnf.PAGE = cmdOpt.PAGE
+        }
+        if os.Getenv(mongoPageSize) != "" {
+            pagesize, err := strconv.Atoi(os.Getenv(mongoPageSize))
+            if err != nil {
+                log.Error(err)
+                pagesize = 1
+            }
+            cnf.PAGESIZE = pagesize
+        }
+        if cmdOpt.PAGESIZE != 0 {
+                cnf.PAGESIZE = cmdOpt.PAGESIZE
+        }
+        if os.Getenv(mongoPickupServer) != "" {
+                cnf.PICKUPSERVER = os.Getenv(mongoPickupServer)
+        }
+        if cmdOpt.PICKUPSERVER != "" {
+                cnf.PICKUPSERVER = cmdOpt.PICKUPSERVER
+        }
 }
 
 

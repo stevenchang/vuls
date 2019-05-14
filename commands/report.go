@@ -21,6 +21,8 @@ import (
 	"context"
 	"flag"
 	"os"
+	"runtime"
+	"sync"
 	"path/filepath"
 
 	c "github.com/future-architect/vuls/config"
@@ -106,6 +108,10 @@ func (*ReportCmd) Usage() string {
 		[-mongodb-uri=mongodb://mongodb0.example.com:27017/admin]
 		[-mongodb-db=vuls]
 		[-mongodb-collection=result]
+		[-mongodb-process-thread=1]
+		[-mongodb-pickup-process-server=hostname]
+		[-mongodb-page=1]
+		[-mongodb-page-size=1]
 		[-http="http://vuls-report-server"]
 
 		[RFC3339 datetime format under results dir]
@@ -207,11 +213,13 @@ func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&p.exploitConf.URL, "exploitdb-url", "",
 		"http://exploit.com:1326 or DB connection string")
 
-	f.StringVar(&p.mongodbConf.URI, "mongodb-uri", "",
-		"mongodb://mongodb0.example.com:27017/admin")
+	f.StringVar(&p.mongodbConf.URI, "mongodb-uri", "","mongodb://mongodb0.example.com:27017/admin")
 	f.StringVar(&p.mongodbConf.DB, "mongodb-db", "", "Mongodb DB Name.")
-	f.StringVar(&p.mongodbConf.Collection, "mongodb-collect", "",
-		"mongodb Collection Name")
+	f.StringVar(&p.mongodbConf.Collection, "mongodb-collect", "", "mongodb Collection Name")
+	f.StringVar(&p.mongodbConf.PICKUPSERVER, "mongodb-pickup-process-server", "", "pick up process Server Name")
+	f.IntVar(&p.mongodbConf.ThreadCnt, "mongodb-process-thread", 1, "mongodb Process Thread Count")
+	f.IntVar(&p.mongodbConf.PAGE, "mongodb-page", 1, "mongodb Process n-th Page")
+	f.IntVar(&p.mongodbConf.PAGESIZE, "mongodb-page-size", 0, "mongodb Process Page Size")
 
 	f.StringVar(&p.httpConf.URL, "http", "", "-to-http http://vuls-report")
 
@@ -345,21 +353,13 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 
 	var loaded models.ScanResults
 
-	if c.Conf.FromMongodb {
-	        if loaded, err = report.LoadScanResultsFromMongo(c.Conf.Mongodb.URI, c.Conf.Mongodb.DB , c.Conf.Mongodb.Collection); err != nil {
-        	        util.Log.Error(err)
-                	return subcommands.ExitFailure
-	        }
-		util.Log.Infof("Loaded Result From Mongodb : %s %s", c.Conf.Mongodb.DB , c.Conf.Mongodb.Collection)
-	} else {
-
+	if !c.Conf.FromMongodb {
 		if loaded, err = report.LoadScanResults(dir); err != nil {
 			util.Log.Error(err)
 			return subcommands.ExitFailure
 		}
 		util.Log.Infof("Loaded: %s", dir)
 	}
-
 
 	var res models.ScanResults
 	for _, r := range loaded {
@@ -443,9 +443,59 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 		}
 		defer dbclient.CloseDB()
 
-		if res, err = report.FillCveInfos(*dbclient, res, dir); err != nil {
-			util.Log.Error(err)
-			return subcommands.ExitFailure
+		if c.Conf.FromMongodb {
+
+			var serverList []string
+
+			mongodbCleint, err := report.NewMongoClient()
+
+                        if serverList,err = report.LoadServerNameFromMongo(
+				mongodbCleint, 
+				c.Conf.Mongodb.DB, 
+				c.Conf.Mongodb.Collection,
+				c.Conf.Mongodb.PAGE, 
+				c.Conf.Mongodb.PAGESIZE,
+				c.Conf.Mongodb.PICKUPSERVER); 
+			err != nil {
+                                util.Log.Errorf("Load Server Name Fail : %v",err)
+                                return subcommands.ExitFailure
+                        }
+
+			nCPU := runtime.NumCPU()
+			util.Log.Debugf("Server Phisical CPU CORE : %d", nCPU)
+			util.Log.Infof("Process Thread Count : %d", c.Conf.Mongodb.ThreadCnt)
+			if ( c.Conf.Mongodb.ThreadCnt > 0 ) { nCPU = c.Conf.Mongodb.ThreadCnt }
+			runtime.GOMAXPROCS(nCPU)
+
+			tasks := make(chan string, len(serverList))
+			var wg sync.WaitGroup
+			for worker := 0; worker < nCPU; worker++ {
+			    wg.Add(1)
+			    go func() {
+			      defer wg.Done()
+
+			      for i := range tasks {
+		                if loaded, err = report.LoadScanResultsFromMongo(c.Conf.Mongodb.URI, c.Conf.Mongodb.DB , c.Conf.Mongodb.Collection, i); err != nil {
+                 	          util.Log.Warnf("Ignored since errors occurred during scanning: %s",i)
+                              	}
+		                if loaded, err = report.FillCveInfos(*dbclient, loaded, dir); err != nil {
+                		  util.Log.Errorf("Fill Cve Info Fail %v",err)
+                              	}
+						
+				}
+			    }()
+			}
+
+			for i := 0; i < len(serverList); i++ {
+				tasks <- serverList[i]
+			}
+			close(tasks)
+			wg.Wait()
+		}else {
+			if res, err = report.FillCveInfos(*dbclient, res, dir); err != nil {
+				util.Log.Error(err)
+				return subcommands.ExitFailure
+			}
 		}
 	}
 

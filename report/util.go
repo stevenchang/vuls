@@ -36,8 +36,10 @@ import (
 	"github.com/future-architect/vuls/util"
 	"github.com/gosuri/uitable"
 	"github.com/olekukonko/tablewriter"
-        "github.com/mongodb/mongo-go-driver/bson"
-        "github.com/mongodb/mongo-go-driver/mongo"
+        "go.mongodb.org/mongo-driver/mongo"
+        "go.mongodb.org/mongo-driver/mongo/options"
+        "go.mongodb.org/mongo-driver/bson"
+        "go.mongodb.org/mongo-driver/x/bsonx"
 
 )
 
@@ -630,29 +632,76 @@ func loadOneServerScanResult(jsonFile string) (*models.ScanResult, error) {
 	return result, nil
 }
 
-// LoadScanResultsFromMongo read JSON data from Mongodb
-func LoadScanResultsFromMongo(uri string,db string,collection string) (results models.ScanResults, err error) {
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	client, err := mongo.Connect(ctx, uri)
+// LoadServerNameFromMongo read Server Name List from Mongodb
+func LoadServerNameFromMongo(client *mongo.Client,db string,collection string,page int, pagesize int, pickupserver string) (results []string, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	var _pagesize = int64(pagesize)
+	var _onpage = int64(page)
+	opt := options.Find().SetProjection(bson.M{"serverName":1})
+	opt.SetSort(bson.M{"serverName":bsonx.Int32(1)})
 
-        if err != nil {
-            util.Log.Errorf("%s", err)
+	if _pagesize > 0 {
+	  opt.SetLimit(_pagesize)
+	  opt.SetSkip(_pagesize*(_onpage-1))
+	  util.Log.Infof("Query Server from %d to %d record", _pagesize*(_onpage-1)+1  , _pagesize*_onpage )
+	}
+	
+	var session mongo.Session
+
+	if session, err = client.StartSession(); err != nil {
+		util.Log.Errorf("%v",err)
+	}
+	if err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+
+		filter := bson.M{}
+
+		if len(pickupserver) > 0 {
+		  filter = bson.M{"serverName" : pickupserver }
+		  util.Log.Debugf("Filter Server Name %s", pickupserver )
+		}
+
+		cursor, err := client.Database(db).Collection(collection).Find(ctx, filter, opt)
+
+	        if err != nil { return err }
+        	defer cursor.Close(context.Background())
+	
+	        for cursor.Next(context.Background()) {
+        	   doc := cursor.Current
+	           results = append(results, doc.Lookup("serverName").String())
+        	   util.Log.Debugf("Server Name %s", doc.Lookup("serverName").String())
+	        }
+
+		return nil
+	}); err != nil {
+		util.Log.Errorf("%v",err)
+	}
+	session.EndSession(ctx)
+
+        if len(results) == 0 {
+                return nil, fmt.Errorf("There is no Document in Mongodb under %s", db)
         }
+        return
+}
 
-        // Check the connection
-	err = client.Ping(ctx, nil)
+// LoadScanResultsFromMongo read JSON data from Mongodb
+func LoadScanResultsFromMongo(uri string,db string,collection string,serverName string) (results models.ScanResults, err error) {
 
-        if err != nil {
-            util.Log.Errorf("%s", err)
-        }
+        client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+        if err != nil { return nil,err }
 
-	cur,err := client.Database(db).Collection(collection).Find(ctx, bson.D{})
+	ctx, cancel := context.WithTimeout(context.Background(),10*time.Second)
+        err = client.Connect(ctx)
+        defer cancel()
+        if err != nil { return nil, err }
+
+        filter := bson.M{"serverName": serverName[1:len(serverName)-1]}
+
+	cur,err := client.Database(db).Collection(collection).Find(ctx, filter )
 
 	if err != nil { util.Log.Errorf("%s", err) }
 
-	util.Log.Info("Starting load server data... ")
+	util.Log.Infof("Starting load %s server data ",serverName)
 	for cur.Next(context.Background()) {
 	   var r *models.ScanResult
 	   err := cur.Decode(&r)
@@ -665,7 +714,7 @@ func LoadScanResultsFromMongo(uri string,db string,collection string) (results m
 
 	defer cur.Close(context.Background())
 
-	defer client.Disconnect(context.TODO())
+	defer client.Disconnect(context.Background())
 
         if len(results) == 0 {
                 return nil, fmt.Errorf("There is no Document in Mongodb under %s", db)

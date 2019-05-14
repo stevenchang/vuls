@@ -20,11 +20,11 @@ package report
 import (
 
     	"context"
-    	"log"
+	"time"
 
-    	"github.com/mongodb/mongo-go-driver/bson"
-    	"github.com/mongodb/mongo-go-driver/mongo"
-    	"github.com/mongodb/mongo-go-driver/mongo/options"
+        "go.mongodb.org/mongo-driver/mongo"
+        "go.mongodb.org/mongo-driver/mongo/options"
+        "go.mongodb.org/mongo-driver/bson"
 
 	c "github.com/future-architect/vuls/config"
 	"github.com/future-architect/vuls/models"
@@ -34,23 +34,24 @@ import (
 // MongodbWriter writes results to Mongodb
 type MongodbWriter struct{}
 
-func getConn() *mongo.Client {
-	client, err := mongo.Connect(context.TODO(), c.Conf.Mongodb.URI)
+func NewMongoClient() (DBClient *mongo.Client,err error) {
+
+        client, err := mongo.NewClient(options.Client().ApplyURI( c.Conf.Mongodb.URI ))
+        if err != nil { return nil,err }
+
+        ctx, cancel := context.WithTimeout(context.Background(),10*time.Second)
+	defer cancel()
+
+	err = client.Connect(ctx)
 
 	if err != nil {
-            log.Fatal(err)
-	}
-
-	// Check the connection
-	err = client.Ping(context.TODO(), nil)
-
-	if err != nil {
-	     log.Fatal(err)
+            util.Log.Fatalf("Could not connect to MongoDB : %+v ", err)
+	    return nil, err
 	}
 
 	util.Log.Debugf("Connected to MongoDB!")
 
-	return client
+	return client, nil
 }
 
 // Write results to Mongodb
@@ -59,24 +60,36 @@ func (w MongodbWriter) Write(rs ...models.ScanResult) (err error) {
 		return nil
 	}
 
-	client := getConn()
-	defer client.Disconnect(context.TODO())
-	defer util.Log.Debugf("Close Connection.")
+        client, err := mongo.NewClient(options.Client().ApplyURI( c.Conf.Mongodb.URI ))
+        if err != nil { return err }
+
+        ctx, cancel := context.WithTimeout(context.Background(),10*time.Second)
+        err = client.Connect(ctx)
+        defer cancel()
+        if err != nil { return err }
+
+        defer client.Disconnect(context.Background())
+
 
 	for _, r := range rs {
-		key := r.ReportFileName()
 
-		util.Log.Debugf("Insert %s Server Scan Result into MongoDB.",key)
+	  key := r.ReportFileName()
 
-		if err := putData(client, r , key); err != nil {
-			util.Log.Errorf("Insert %s Server into MongoDB fail : %s ",key,err)
-			return err
-		}
+	  filter := bson.M{ "serverName" : key }
+
+	  util.Log.Debugf("Insert %s Server Scan Result into MongoDB.",key)
+
+	  opt := options.Replace().SetUpsert(true)
+
+	  if _, err := client.Database( c.Conf.Mongodb.DB ).Collection( c.Conf.Mongodb.Collection ).ReplaceOne( context.Background(), filter , r , opt ); err!= nil {
+	    util.Log.Errorf("Insert %s Server into MongoDB fail : %v ",key, err)
+	    return err
+	  }
 
 	}
 	return nil
 }
-
+/*
 func putData(client *mongo.Client, data models.ScanResult, key string) error {
 
 	collection := client.Database(c.Conf.Mongodb.DB).Collection(c.Conf.Mongodb.Collection)
@@ -86,7 +99,7 @@ func putData(client *mongo.Client, data models.ScanResult, key string) error {
 	
 	var upsert = true 
 
-	rep, err := collection.ReplaceOne( context.TODO(), filter , &data , &options.ReplaceOptions{ Upsert: &upsert })
+	rep, err := collection.ReplaceOne( context.Background(), filter , &data , &options.ReplaceOptions{ Upsert: &upsert })
 
 	if err != nil {
 	    return err
@@ -94,8 +107,6 @@ func putData(client *mongo.Client, data models.ScanResult, key string) error {
 
 	util.Log.Infof("Insert Result to Mongodb finished")
 
-	util.Log.Debugf("DB Insert Result : %+v ", rep)
-
 	return nil
 }
-
+*/
